@@ -5,26 +5,20 @@ local fn = vim.fn
 
 -- Plugin configuration
 local config = {
-  -- Window options for floating window
-  window = {
-    width = 0.8,
-    height = 0.8,
-    border = "rounded",
-  },
   -- Whether to replace netrw
   replace_netrw = true,
-  -- Whether to create key mapping for ESC qutting lf
+  -- Whether to create key mapping for ESC quitting lf
   escape_quit = true,
   -- Selection file path
-  selection_file = vim.fn.stdpath("cache") .. "/lf_selection",
+  selection_file = fn.stdpath("cache") .. "/lf_selection"
 }
 
 -- Internal state
 local state = {
   buffers_before = {},
-  win_id = nil,
-  buf_id = nil,
   original_win = nil,
+  original_buf = nil,
+  buf_id = nil
 }
 
 ---Get list of currently open file buffers
@@ -49,29 +43,12 @@ local function cleanup_deleted_buffers(buffers_before)
     if fn.filereadable(buf_name) ~= 1 then
       local buf_nr = fn.bufnr(buf_name)
       if buf_nr ~= -1 then
-        pcall(api.nvim_buf_delete, buf_nr, { force = true })
+        pcall(api.nvim_buf_delete, buf_nr, {
+          force = true
+        })
       end
     end
   end
-end
-
----Calculate window dimensions for floating window
----@return table
-local function get_window_config()
-  local width = math.floor(vim.o.columns * config.window.width)
-  local height = math.floor(vim.o.lines * config.window.height)
-  local row = math.floor((vim.o.lines - height) / 2)
-  local col = math.floor((vim.o.columns - width) / 2)
-
-  return {
-    relative = "editor",
-    width = width,
-    height = height,
-    row = row,
-    col = col,
-    border = config.window.border,
-    style = "minimal",
-  }
 end
 
 ---Open selected files from lf
@@ -96,19 +73,19 @@ local function open_selected_files()
   fn.delete(config.selection_file)
 end
 
----Close the lf window and handle cleanup
+---Close the lf buffer and handle cleanup
 local function close_lf()
-  if state.win_id and api.nvim_win_is_valid(state.win_id) then
-    api.nvim_win_close(state.win_id, true)
+  -- Restore original buffer to window
+  if state.original_win and api.nvim_win_is_valid(state.original_win) and state.original_buf and
+      api.nvim_buf_is_valid(state.original_buf) then
+    api.nvim_win_set_buf(state.original_win, state.original_buf)
   end
 
+  -- Delete the lf buffer
   if state.buf_id and api.nvim_buf_is_valid(state.buf_id) then
-    api.nvim_buf_delete(state.buf_id, { force = true })
-  end
-
-  -- Return to original window
-  if state.original_win and api.nvim_win_is_valid(state.original_win) then
-    api.nvim_set_current_win(state.original_win)
+    api.nvim_buf_delete(state.buf_id, {
+      force = true
+    })
   end
 
   -- Process selected files
@@ -118,16 +95,20 @@ local function close_lf()
   cleanup_deleted_buffers(state.buffers_before)
 
   -- Reset state
-  state.win_id = nil
-  state.buf_id = nil
   state.original_win = nil
+  state.original_buf = nil
+  state.buf_id = nil
   state.buffers_before = {}
 end
 
 ---Setup key mappings for the lf buffer
 ---@param buf_id number
 local function setup_mappings(buf_id)
-  local opts = { buffer = buf_id, noremap = true, silent = true }
+  local opts = {
+    buffer = buf_id,
+    noremap = true,
+    silent = true
+  }
 
   -- Quit lf
   if config.escape_quit then
@@ -135,7 +116,7 @@ local function setup_mappings(buf_id)
   end
   vim.keymap.set("t", "q", function()
     -- Send 'q' to lf to quit
-    vim.api.nvim_feedkeys("q", "t", false)
+    api.nvim_feedkeys("q", "t", false)
   end, opts)
 end
 
@@ -148,8 +129,12 @@ function M.open(path)
     return
   end
 
+  -- Clean up any existing selection file
+  fn.delete(config.selection_file)
+
   -- Store current state
   state.original_win = api.nvim_get_current_win()
+  state.original_buf = api.nvim_win_get_buf(state.original_win)
   state.buffers_before = get_file_buffers()
 
   -- Determine starting directory
@@ -158,37 +143,28 @@ function M.open(path)
     start_dir = fn.fnamemodify(start_dir, ":h")
   end
 
-  -- Create floating window
+  -- Create new buffer for lf
   local buf_id = api.nvim_create_buf(false, true)
-  local win_config = get_window_config()
-  local win_id = api.nvim_open_win(buf_id, true, win_config)
-
-  -- Store window and buffer IDs
-  state.win_id = win_id
+  api.nvim_win_set_buf(state.original_win, buf_id)
   state.buf_id = buf_id
 
   -- Set buffer options
-  api.nvim_set_option_value("filetype", "lf", { buf = buf_id })
-  api.nvim_set_option_value("winhl", "Normal:Normal", { win = win_id })
-
-  -- Build lf command
-  local cmd = string.format(
-    "lf -selection-path='%s' '%s'",
-    config.selection_file,
-    start_dir
-  )
-
-  -- Setup terminal job
-  local job_id = fn.jobstart(cmd, {
-    on_exit = function(_, _, _)
-      vim.schedule(function()
-        close_lf()
-      end)
-    end,
-    term = true,
+  api.nvim_set_option_value("filetype", "lf", {
+    buf = buf_id
   })
 
-  if job_id <= 0 then
+  -- Build lf command
+  local cmd = string.format("lf -selection-path='%s' '%s'", config.selection_file, start_dir)
+
+  -- Setup terminal
+  local term_buf = fn.jobstart(cmd, {
+    on_exit = function(_, _, _)
+      vim.schedule(close_lf)
+    end,
+    term = true
+  })
+
+  if term_buf == 0 then
     vim.notify("Failed to start lf", vim.log.levels.ERROR)
     close_lf()
     return
@@ -211,7 +187,9 @@ local function setup_netrw_replacement()
   vim.g.loaded_netrw = 1
   vim.g.loaded_netrwPlugin = 1
 
-  local group = api.nvim_create_augroup("LfSimple", { clear = true })
+  local group = api.nvim_create_augroup("LfSimple", {
+    clear = true
+  })
 
   -- Replace netrw when opening directories
   api.nvim_create_autocmd({ "BufEnter", "BufNewFile" }, {
@@ -221,11 +199,13 @@ local function setup_netrw_replacement()
       if buf_name ~= "" and fn.isdirectory(buf_name) == 1 then
         -- Delete the directory buffer and open lf
         vim.schedule(function()
-          api.nvim_buf_delete(0, { force = true })
+          api.nvim_buf_delete(0, {
+            force = true
+          })
           M.open(buf_name)
         end)
       end
-    end,
+    end
   })
 end
 
@@ -243,7 +223,7 @@ function M.setup(opts)
   end, {
     nargs = "?",
     complete = "dir",
-    desc = "Open lf file manager",
+    desc = "Open lf file manager"
   })
 
   -- Setup netrw replacement if enabled
