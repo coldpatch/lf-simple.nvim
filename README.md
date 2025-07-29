@@ -1,4 +1,3 @@
-
 # lf-simple.nvim
 
 A lightweight Neovim plugin for the [lf](https://github.com/gokcehan/lf) file manager with automatic buffer cleanup.
@@ -14,7 +13,7 @@ vim.pack.add({
   "https://github.com/coldpatch/lf-simple.nvim",
 })
 
-require("lf").setup({})
+require("lf-simple").setup({})
 ```
 
 ### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
@@ -56,10 +55,10 @@ require("lf-simple").setup({
         height = 0.8,  -- 80% of screen height
         border = "rounded", -- Border style: "single", "double", "rounded", "solid", "shadow"
     },
-    
+
     -- Replace netrw with lf (default: true)
     replace_netrw = true,
-    
+
     -- Custom selection file path (optional)
     selection_file = vim.fn.stdpath("cache") .. "/lf_selection",
 })
@@ -110,8 +109,7 @@ This plugin automatically tracks file buffers before opening lf and cleans up an
 
 1. **Before opening lf**: Records all currently open file buffers
 2. **During lf session**: lf can navigate and open files normally
-3. **After closing lf**: 
+3. **After closing lf**:
    - Opens any files selected in lf
    - Closes directory buffers that no longer point to existing files
    - Returns focus to the original window
-
