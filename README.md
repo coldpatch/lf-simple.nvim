@@ -13,7 +13,7 @@ vim.pack.add({
   "https://github.com/coldpatch/lf-simple.nvim",
 })
 
-require("lf-simple").setup({})
+require("lf-simple").setup()
 ```
 
 ### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
@@ -22,9 +22,7 @@ require("lf-simple").setup({})
 {
     "ashaibani/lf-simple.nvim",
     config = function()
-        require("lf-simple").setup({
-            -- Optional configuration
-        })
+        require("lf-simple").setup()
     end,
 }
 ```
@@ -49,15 +47,11 @@ use {
 
 ```lua
 require("lf-simple").setup({
-    -- Window configuration
-    window = {
-        width = 0.8,   -- 80% of screen width
-        height = 0.8,  -- 80% of screen height
-        border = "rounded", -- Border style: "single", "double", "rounded", "solid", "shadow"
-    },
-
     -- Replace netrw with lf (default: true)
     replace_netrw = true,
+
+    -- Setup ESC quit with lf (default: true)
+    escape_quit = true,
 
     -- Custom selection file path (optional)
     selection_file = vim.fn.stdpath("cache") .. "/lf_selection",

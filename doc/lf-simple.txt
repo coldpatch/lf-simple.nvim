@@ -21,13 +21,6 @@ lf-simple.nvim is a lightweight Neovim plugin that provides integration with
 the lf file manager. It focuses on simplicity and proper buffer management,
 automatically cleaning up directory buffers after the file manager exits.
 
-Key features:
-- Minimal dependencies
-- Smart buffer cleanup
-- Floating window interface
-- Optional netrw replacement
-- Simple configuration
-
 ==============================================================================
 2. REQUIREMENTS                                         *lf-simple-requirements*
 
@@ -65,29 +58,19 @@ Using packer.nvim: >
 
 Default configuration: >
     require("lf-simple").setup({
-        window = {
-            width = 0.8,
-            height = 0.8,
-            border = "rounded",
-        },
-        replace_netrw = false,
+        replace_netrw = true,
+        escape_quit = true,
         selection_file = vim.fn.stdpath("cache") .. "/lf_selection",
     })
 <
 
 Configuration options:
 
-*window.width*              (number, default: 0.8)
-    Width of the floating window as a percentage of screen width.
-
-*window.height*             (number, default: 0.8)
-    Height of the floating window as a percentage of screen height.
-
-*window.border*             (string, default: "rounded")
-    Border style for the floating window.
-
 *replace_netrw*             (boolean, default: true)
     Whether to replace netrw with lf for directory browsing.
+
+*escape_quit*             (boolean, default: true)
+    Whether to create key mapping for ESC qutting lf.
 
 *selection_file*            (string)
     Path to the temporary file used for lf selections.
@@ -102,8 +85,8 @@ Commands:
     directory, otherwise open in current working directory.
 
 Key mappings (inside lf):
-    <Esc>    Close lf and return to Neovim
     q        Quit lf (standard lf behavior)
+    <Esc>    Close lf and return to Neovim (if escape_quit is set to true)
 
 Example key mappings: >
     vim.keymap.set("n", "<leader>lf", "<cmd>Lf<cr>")

@@ -12,7 +12,9 @@ local config = {
     border = "rounded",
   },
   -- Whether to replace netrw
-  replace_netrw = false,
+  replace_netrw = true,
+  -- Whether to create key mapping for ESC qutting lf
+  escape_quit = true,
   -- Selection file path
   selection_file = vim.fn.stdpath("cache") .. "/lf_selection",
 }
@@ -128,7 +130,9 @@ local function setup_mappings(buf_id)
   local opts = { buffer = buf_id, noremap = true, silent = true }
 
   -- Quit lf
-  vim.keymap.set("t", "<Esc>", close_lf, opts)
+  if config.escape_quit then
+    vim.keymap.set("n", "<Esc>", close_lf, opts)
+  end
   vim.keymap.set("t", "q", function()
     -- Send 'q' to lf to quit
     vim.api.nvim_feedkeys("q", "t", false)
@@ -164,8 +168,8 @@ function M.open(path)
   state.buf_id = buf_id
 
   -- Set buffer options
-  api.set_option_value("filetype", "lf", { buf = buf_id })
-  api.set_option_value("winhl", "Normal:Normal", { win = win_id })
+  api.nvim_set_option_value("filetype", "lf", { buf = buf_id })
+  api.nvim_set_option_value("winhl", "Normal:Normal", { win = win_id })
 
   -- Build lf command
   local cmd = string.format(
@@ -175,7 +179,7 @@ function M.open(path)
   )
 
   -- Setup terminal job
-  local job_id = fn.startjob(cmd, {
+  local job_id = fn.jobstart(cmd, {
     on_exit = function(_, _, _)
       vim.schedule(function()
         close_lf()
@@ -183,14 +187,6 @@ function M.open(path)
     end,
     term = true,
   })
-
-  -- local job_id = fn.termopen(cmd, {
-  --   on_exit = function(_, exit_code, _)
-  --     vim.schedule(function()
-  --       close_lf()
-  --     end)
-  --   end,
-  -- })
 
   if job_id <= 0 then
     vim.notify("Failed to start lf", vim.log.levels.ERROR)
